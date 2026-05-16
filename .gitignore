@@ -1,0 +1,62 @@
+# Model weights — withheld pending journal publication
+models/*.pkl
+models/*.h5
+models/*.pt
+models/*.bin
+
+# Keep the model metadata and README in models folder
+!models/metadata.json
+!models/README.md
+
+# Training data
+data/
+datasets/
+
+# Private training scripts (NEVER commit these)
+save_model.py
+train_model.py
+training/
+experiments/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.env
+venv/
+.venv/
+dist/
+build/
+*.egg-info/
+
+# Notebook checkpoints
+.ipynb_checkpoints/
+*.ipynb
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+.desktop.ini
+
+# Backup and temp files
+*.zip
+*.tar
+*.gz
+backups/
+temp/
+tmp/
+*.log
+*.bak
+
+# Streamlit secrets (if any)
+.streamlit/secrets.toml
+
+# Deployment configs (if they contain keys)
+config.yml
+credentials.json
