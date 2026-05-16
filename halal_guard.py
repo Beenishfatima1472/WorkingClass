@@ -98,6 +98,37 @@ class HalalGuard:
             r"\bhidden.{0,20}(fee|charge|cost)\b",
         ]
 
+        # ── Percentage-based fee on loans (Hidden Riba — AAOIFI violation)
+        self.fee_riba_patterns = [
+            r"(service fee|admin fee|processing fee|administrative fee).{0,30}\d+%",
+            r"\d+%.{0,30}(service fee|admin fee|processing fee)",
+            r"(flat fee|fixed fee).{0,30}\d+%.{0,30}(loan|borrow|credit|qard)",
+            r"(loan|qard|borrow).{0,60}(service fee|admin fee).{0,30}\d+%",
+            r"microloan.{0,40}\d+%.{0,20}fee",
+            r"percentage.{0,20}(fee|charge).{0,20}(loan|qard)",
+        ]
+
+        # ── DeFi / crypto high-uncertainty (Gharar/Maysir risk → scholar review)
+        self.defi_uncertainty_patterns = [
+            r"\b(defi|de-fi)\b",
+            r"\bautomated market maker\b",
+            r"\bamm\b",
+            r"\byield farm(ing)?\b",
+            r"\bliquidity pool\b",
+            r"\bimpermanent loss\b",
+            r"\bcrypto.{0,30}(profit sharing|mudarabah|halal)\b",
+            r"\bnft.{0,30}(invest|earn|halal|return)\b",
+        ]
+
+        # ── Fake mudarabah / fake Islamic banking
+        self.fake_islamic_banking = [
+            r"\bclaims?.{0,30}(maqasid|shariah|halal).{0,60}(savings|deposit|account)\b",
+            r"\bmudarabah.{0,60}(guarantee|guaranteed|protected|fixed return)\b",
+            r"\bprofit.sharing.{0,60}(guarantee|guaranteed|fixed|protect)\b",
+            r"\binterest.free.{0,40}(but|however|yet).{0,40}(fee|charge|rate)\b",
+            r"\b(digital bank|neobank|fintech).{0,60}(mudarabah|profit.sharing).{0,60}(guarantee|protect|fixed)\b",
+        ]
+
         # ══════════════════════════════════════════════════════
         # PILLAR 4 — Hifz al-Nasl: Protection of Lineage
         # ══════════════════════════════════════════════════════
@@ -167,6 +198,7 @@ class HalalGuard:
         r = PillarResult("Hifz al-Din (Protection of Faith)", 10, 10)
         ff = self._hits(text, self.fake_fatwa_patterns)
         bl = self._hits(text, self.blasphemy_patterns)
+        fib = self._hits(text, self.fake_islamic_banking)
         if ff:
             r.score = max(0, r.score - 5)
             r.violations.append(
@@ -178,6 +210,12 @@ class HalalGuard:
             r.violations.append(
                 "CRITICAL [Belief Respect]: Blasphemous or disrespectful "
                 "content toward Islamic beliefs detected."
+            )
+        if fib:
+            r.score = max(0, r.score - 5)
+            r.violations.append(
+                "CRITICAL [Authenticity]: Fake Islamic banking claim detected — "
+                "guaranteed returns in Mudarabah contracts violate Shariah structure."
             )
         return r
 
@@ -223,10 +261,18 @@ class HalalGuard:
         riba   = self._hits(text, self.riba_patterns)
         gharar = self._hits(text, self.gharar_patterns)
         maysir = self._hits(text, self.maysir_patterns)
+        fee_riba = self._hits(text, self.fee_riba_patterns)
+        defi   = self._hits(text, self.defi_uncertainty_patterns)
         if riba:
             r.score = max(0, r.score - 5)
             r.violations.append(
                 "VIOLATION [Financial Ethics]: Riba (interest/usury) detected."
+            )
+        if fee_riba:
+            r.score = max(0, r.score - 5)
+            r.violations.append(
+                "VIOLATION [Financial Ethics]: Hidden Riba detected — percentage-based "
+                "service fees on loans scale with principal, violating AAOIFI Shariah Standards."
             )
         if gharar:
             r.score = max(0, r.score - 3)
@@ -238,6 +284,13 @@ class HalalGuard:
             r.score = max(0, r.score - 2)
             r.violations.append(
                 "VIOLATION [Financial Ethics]: Maysir (gambling/speculation) detected."
+            )
+        if defi and not riba and not gharar and not maysir:
+            # DeFi alone = scholar review, not auto-flag
+            r.warnings.append(
+                "⚠️ SCHOLAR REVIEW REQUIRED: DeFi/crypto terms detected. "
+                "Scholarly consensus on AMM, yield farming, and crypto liquidity pools "
+                "is unresolved — requires qualified Shariah auditor review."
             )
         return r
 
@@ -255,7 +308,19 @@ class HalalGuard:
         ]
         total = sum(r.score for r in results)
 
-        if total == 50:
+        # Collect all violations across pillars
+        all_violations = []
+        for r in results:
+            all_violations.extend(r.violations)
+
+        # ANY CRITICAL violation = automatic NOT_CERTIFIED
+        # regardless of total score. A fake fatwa or medical
+        # misinformation is never "Compliant with Recommendations."
+        has_critical = any("CRITICAL" in v for v in all_violations)
+
+        if has_critical:
+            status, tier = "❌ Not Certified — Critical Violation", "NOT_CERTIFIED"
+        elif total == 50:
             status, tier = "🏆 Fully Halal Certified", "CERTIFIED"
         elif total >= 40:
             status, tier = "✅ Halal Compliant with Recommendations", "COMPLIANT"
@@ -264,10 +329,10 @@ class HalalGuard:
         else:
             status, tier = "❌ Not Certified", "NOT_CERTIFIED"
 
-        pillars, violations, warnings = {}, [], []
+        pillars, warnings = {}, []
+        violations = all_violations
         for r in results:
             pillars[r.pillar] = {"score": r.score, "max": r.max_score}
-            violations.extend(r.violations)
             warnings.extend(r.warnings)
 
         return {
