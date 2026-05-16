@@ -293,69 +293,28 @@ if run_btn and user_input.strip():
             top_prob  = ml_result.get("top_violation_prob", 0)
             needs_rev = ml_result.get("requires_review", False)
 
+            # ── Native Streamlit ML box (no raw HTML — fixes rendering bug) ──
+            st.markdown("**🔬 ML Classifier (v4)**")
+
             if pred_id == 0:
-                ml_color  = "#2e7d32"
-                verdict   = "✅ Authentic"
-                verd_bg   = "#e8f5e9"
-                verd_fc   = "#1b5e20"
+                st.success(f"✅ Authentic  |  conf={conf:.2f}")
             else:
-                ml_color  = "#c62828"
-                verdict   = f"⚠️ {pred}"
-                verd_bg   = "#fdeaea"
-                verd_fc   = "#7b1c1c"
+                st.error(f"⚠️ {pred}  |  conf={conf:.2f}")
 
-            review_html = (
-                '<div style="font-size:0.75rem;background:#fff8e1;border-radius:4px;'
-                'padding:3px 8px;color:#7d5a00;margin-top:6px;">⚠️ Scholar review recommended</div>'
-                if needs_rev else ""
-            )
+            if needs_rev:
+                st.warning("Scholar review recommended for this prediction")
 
-            # Build mini probability bar for top 3
+            # Probability bars using native st.progress
             all_probs = ml_result.get("all_probs", {})
             top3 = sorted(all_probs.items(), key=lambda x: -x[1])[:3]
-            bars_html = ""
             for lname, lprob in top3:
-                bar_w  = int(lprob * 100)
-                bar_c  = "#2e7d32" if lname == "Authentic" else "#c62828"
-                short  = lname[:22] + ("…" if len(lname) > 22 else "")
-                bars_html += f"""
-                <div style="margin:3px 0;">
-                  <div style="display:flex;justify-content:space-between;
-                              font-size:0.72rem;color:#555;">
-                    <span>{short}</span><span>{lprob:.2f}</span>
-                  </div>
-                  <div style="background:#e0ddd8;border-radius:99px;height:4px;">
-                    <div style="background:{bar_c};width:{bar_w}%;
-                                height:4px;border-radius:99px;"></div>
-                  </div>
-                </div>"""
+                short = lname[:30] + ("…" if len(lname) > 30 else "")
+                st.caption(f"{short}  —  {lprob:.2f}")
+                st.progress(float(lprob))
 
-            st.markdown(f"""
-            <div class="ml-box">
-                <div class="ml-box-title">🔬 ML Classifier (v4)</div>
-                <div style="background:{verd_bg};border-radius:6px;
-                            padding:5px 10px;margin-bottom:8px;">
-                    <span style="font-size:0.85rem;font-weight:500;
-                                 color:{verd_fc};">{verdict}</span>
-                    <span style="font-size:0.75rem;color:{verd_fc};
-                                 font-family:'DM Mono',monospace;
-                                 margin-left:8px;">conf={conf:.2f}</span>
-                </div>
-                {bars_html}
-                {review_html}
-            </div>
-            """, unsafe_allow_html=True)
         else:
-            st.markdown("""
-            <div class="ml-box" style="opacity:0.6">
-                <div class="ml-box-title">🔬 ML Classifier (v4)</div>
-                <div style="font-size:0.85rem;color:#555;">
-                    Model weights not found in <code>models/</code> folder.<br>
-                    Upload <code>ml_model.pkl</code> to the <code>models/</code>
-                    folder on GitHub to activate the ML layer.
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
+            st.markdown("**🔬 ML Classifier (v4)**")
+            st.caption("Model weights not loaded. Upload `models/ml_model.pkl` to GitHub to activate.")
 
     # ── per-pillar breakdown ──────────────────────────────
     st.markdown("#### Per-Pillar Breakdown")
