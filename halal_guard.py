@@ -46,6 +46,17 @@ class HalalGuard:
             r"\bdrinking.{0,30}(permissible|allowed|halal|ok)\b",
             r"\bintoxicat.{0,60}not (drinking|consuming)\b",
             r"\bquran only forbids\b",
+            # Social media fake fatwas
+            r"\bsheikh google\b",
+            r"\bsheikh youtube\b",
+            r"\bsheikh (reddit|twitter|tiktok|instagram)\b",
+            r"\byoutube.{0,30}scholars?.{0,30}(approved|certified|halal)\b",
+            r"\bmultiple scholars?.{0,30}(youtube|social media|online).{0,30}(approved|certified)\b",
+            # AI claiming to give certified shariah rulings
+            r"\bprovide.{0,20}certified shariah rulings?\b",
+            r"\bcertified shariah rulings? (for|instantly|automatically)\b",
+            r"\binstantly.{0,30}(shariah|islamic|halal).{0,30}ruling\b",
+            r"\bask me.{0,40}(shariah ruling|halal ruling|islamic ruling)\b",
         ]
 
         self.blasphemy_patterns = [
@@ -156,6 +167,19 @@ class HalalGuard:
             r"\bfixed.{0,20}interest\b",
             r"\binterest.{0,30}loan\b",
             r"\bcompound interest\b",
+            # BNPL hidden riba — only when promoting, not warning about
+            r"\bbuy now.{0,5}pay later.{0,60}(fee|charge|applies|split)\b",
+            r"\bbnpl.{0,30}(fee|charge|apply|sign up|join|get)\b",
+            r"\binstallment fee\b",
+            r"\blate.{0,10}fee.{0,20}(applies|charged|payment missed)\b",
+            # Forex leverage = riba-adjacent + maysir
+            r"\bmargin trading\b",
+            r"\bleverage.{0,20}(trade|trading|forex)\b",
+            r"\bforex.{0,20}leverage\b",
+            # Variable/LIBOR-linked murabaha = riba
+            r"\bprofit rate.{0,30}(libor|sofr|adjusts|variable|floating)\b",
+            r"\blibor.{0,30}(plus|profit|rate)\b",
+            r"\badjusts.{0,20}(monthly|quarterly).{0,20}(profit|rate)\b",
         ]
 
         self.gharar_patterns = [
@@ -169,6 +193,24 @@ class HalalGuard:
             r"\bmanipulate.{0,20}price\b",
             r"\bpump.{0,10}dump\b",
             r"\brug pull\b",
+            # Conventional insurance disguised
+            r"\bguaranteed payout\b",
+            r"\blife insurance.{0,40}guaranteed\b",
+            r"\bfixed bonus.{0,30}(takaful|insurance)\b",
+            r"\btakaful.{0,40}(guarantee|guaranteed|fixed bonus)\b",
+            # Crypto APY / staking disguised
+            r"\b(apy|apr).{0,20}(stake|earn|yield|crypto|usdt|usdc)\b",
+            r"\bstake.{0,30}(earn|apy|apr|passive|secured|insured)\b",
+            r"\b(secured|insured).{0,30}(staking|crypto|yield)\b",
+            # Ponzi / investment circle
+            r"\b(halal.{0,20})?investment circle.{0,40}(recruit|refer|principal back)\b",
+            r"\brecruit.{0,30}(get|earn).{0,30}principal back\b",
+            r"\bmembers?.{0,30}recruit.{0,30}(return|back|profit)\b",
+            # Manipulative urgency + fake scarcity
+            r"\bonly \d+.{0,10}spot.{0,20}left\b",
+            r"\bact now.{0,20}(close|expire|tonight|limited)\b",
+            r"\bcloses.{0,20}tonight\b",
+            r"\blimited.{0,20}spot.{0,20}(halal|invest|fund)\b",
         ]
 
         self.maysir_patterns = [
@@ -187,6 +229,25 @@ class HalalGuard:
     # ─────────────────────────────────────────────────
 
     def _hits(self, text: str, patterns: List[str]) -> List[str]:
+        t = text.lower()
+        return [p for p in patterns if re.search(p, t)]
+
+    def _is_educational(self, text: str) -> bool:
+        """Returns True if text is warning about a violation, not promoting it."""
+        t = text.lower()
+        warning_signals = [
+            r"\bwarning\b", r"\bcaution\b", r"\bbeware\b", r"\bavoid\b",
+            r"\bdo not\b", r"\bdon't\b", r"\bharam\b", r"\bforbidden\b",
+            r"\bprohibited\b", r"\bmuslims? should\b", r"\bcheck before\b",
+            r"\bverify before\b", r"\bconstitute riba\b", r"\bconstitutes riba\b",
+        ]
+        promo_signals = [
+            r"\bapply\b", r"\bjoin\b", r"\bsign up\b", r"\bget now\b",
+            r"\bear?n\b", r"\bour (plan|product|service|fund)\b",
+        ]
+        has_warning = any(re.search(p, t) for p in warning_signals)
+        has_promo   = any(re.search(p, t) for p in promo_signals)
+        return has_warning and not has_promo
         t = text.lower()
         return [p for p in patterns if re.search(p, t)]
 
@@ -258,6 +319,13 @@ class HalalGuard:
 
     def _check_property(self, text: str) -> PillarResult:
         r = PillarResult("Hifz al-Mal (Protection of Property)", 10, 10)
+
+        # If text is educational/warning, don't flag financial violations
+        if self._is_educational(text):
+            r.warnings.append(
+                "NOTE: Educational content about financial violations — not flagged as violation."
+            )
+            return r
         riba   = self._hits(text, self.riba_patterns)
         gharar = self._hits(text, self.gharar_patterns)
         maysir = self._hits(text, self.maysir_patterns)
