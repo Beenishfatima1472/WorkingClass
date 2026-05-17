@@ -161,6 +161,12 @@ class HalalGuard:
 
         self.riba_patterns = [
             r"\binterest.?(rate|bearing|based|payment|charge)\b",
+            r"\bannual interest\b",
+            r"\bcharges.{0,20}interest\b",
+            r"\binterest on.{0,20}balance\b",
+            r"\binterest on.{0,20}loan\b",
+            r"\b\d+%.{0,20}(annual |monthly |)interest\b",
+            r"\binterest.{0,10}balance\b",
             r"\bpayday loan\b",
             r"\busury\b",
             r"\bloan.{0,30}interest\b",
@@ -240,6 +246,10 @@ class HalalGuard:
             r"\bdo not\b", r"\bdon't\b", r"\bharam\b", r"\bforbidden\b",
             r"\bprohibited\b", r"\bmuslims? should\b", r"\bcheck before\b",
             r"\bverify before\b", r"\bconstitute riba\b", r"\bconstitutes riba\b",
+            r"\bavoiding interest\b", r"\bwithout interest\b",
+            r"\bnot (charging|using|taking).{0,20}interest\b",
+            r"\breport.{0,30}growth\b",
+            r"\bislamic bank.{0,40}(report|avoid|growth|compli)\b",
         ]
         promo_signals = [
             r"\bapply\b", r"\bjoin\b", r"\bsign up\b", r"\bget now\b",
